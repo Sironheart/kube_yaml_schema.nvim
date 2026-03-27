@@ -10,6 +10,13 @@ This plugin configures `yamlls` to use:
 
 No modelines are required.
 
+## Disclaimer
+
+This plugin was heavily vibe coded as a starting point. 
+I used OpenAI 5.3 Codex up until v1.0.0 and will now start to use less and less AI.
+
+I plan on maintaining it to be deprecation free with the latest stable release.
+
 ## Features
 
 - Automatic schema application for YAML buffers.
