@@ -30,7 +30,6 @@ No modelines are required.
 ```lua
 {
   'your-org/kube-yaml-schema.nvim',
-  main = 'kube_yaml_schema',
   ft = { 'yaml', 'yaml.docker-compose', 'yaml.gitlab', 'yaml.helm-values' },
   cmd = {
     'KubeYamlSchemaRefresh',
