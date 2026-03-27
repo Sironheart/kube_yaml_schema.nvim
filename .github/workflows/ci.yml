@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Check Lua formatting
         uses: JohnnyMorganz/stylua-action@v4
@@ -39,7 +39,7 @@ jobs:
           - nightly
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Neovim
         uses: rhysd/action-setup-vim@v1
