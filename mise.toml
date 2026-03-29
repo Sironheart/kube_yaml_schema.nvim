@@ -9,7 +9,7 @@ run = "stylua --check ."
 
 [tasks.lint]
 description = "Run static analysis"
-run = "selene lua tests"
+run = "selene lua tests plugin"
 
 [tasks.smoke]
 description = "Run smoke tests"

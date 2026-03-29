@@ -73,6 +73,7 @@ local function run_options_tests()
     cache_ttl_seconds = -1,
     refresh_events = {},
     context = "",
+    kubectl_timeout_ms = -10,
   })
 
   assert_true(
@@ -85,6 +86,18 @@ local function run_options_tests()
     "refresh_events should fall back to defaults"
   )
   assert_true(normalized.context == nil, "empty context should normalize to nil")
+  assert_true(
+    normalized.kubectl_timeout_ms == constants.defaults.kubectl_timeout_ms,
+    "non-positive kubectl_timeout_ms should fall back to default"
+  )
+
+  local valid, err, unknown = constants.validate_options({
+    kubectl_timeout_ms = "bad",
+    unknown_option = true,
+  }, "tests")
+  assert_true(valid == false, "validate_options should reject invalid field types")
+  assert_true(type(err) == "string" and err ~= "", "validate_options should return an error message")
+  assert_equal(unknown, { "unknown_option" }, "validate_options should report unknown option keys")
 end
 
 ---@return nil
@@ -105,6 +118,24 @@ local function run_config_tests()
   )
 end
 
+---@return nil
+local function run_command_completion_tests()
+  plugin.setup({ auto_refresh = false })
+
+  local root_completions = plugin.complete_user_command("re", "KubeYamlSchema re")
+  assert_true(
+    vim.list_contains(root_completions, "refresh") and vim.list_contains(root_completions, "refresh-all"),
+    "complete_user_command should complete subcommands"
+  )
+
+  local context_completions = plugin.complete_user_command("cu", "KubeYamlSchema context cu")
+  assert_true(
+    vim.list_contains(context_completions, "current"),
+    "complete_user_command should complete context arguments"
+  )
+end
+
 run_parser_tests()
 run_options_tests()
 run_config_tests()
+run_command_completion_tests()
