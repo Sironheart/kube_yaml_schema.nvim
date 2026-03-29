@@ -1,3 +1,24 @@
 [tools]
 neovim = "0.11.6"
 stylua = "latest"
+"aqua:Kampfkarren/selene" = "latest"
+
+[tasks.format]
+description = "Check Lua formatting"
+run = "stylua --check ."
+
+[tasks.lint]
+description = "Run static analysis"
+run = "selene lua tests"
+
+[tasks.smoke]
+description = "Run smoke tests"
+run = "nvim --headless -u NONE -l tests/smoke.lua"
+
+[tasks.check]
+description = "Run all project checks"
+depends = ["format", "lint", "smoke"]
+
+[tasks.release_archive]
+description = "Build release archive"
+run = "mkdir -p dist && git archive --format=tar.gz --output=\"dist/${REPO_NAME}-${REF_NAME}.tar.gz\" HEAD"

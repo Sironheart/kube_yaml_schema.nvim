@@ -32,6 +32,16 @@ I plan on maintaining it to be deprecation free with the latest stable release.
 - `kubectl` in `$PATH`
 - `yaml-language-server` / `yamlls`
 
+## Development checks
+
+```sh
+mise run format
+mise run lint
+mise run smoke
+# all checks
+mise run check
+```
+
 ## Lazy.nvim setup
 
 ```lua
@@ -86,4 +96,3 @@ end
 - `:KubeYamlSchemaContext auto` clear override and follow `kubectl current-context`.
 - `:KubeYamlSchemaContext current` show active context/cluster.
 - `:KubeYamlSchemaClearCache` clear on-disk and runtime cache.
-

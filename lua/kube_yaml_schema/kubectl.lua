@@ -1,6 +1,5 @@
 local cache = require("kube_yaml_schema.cache")
 local state = require("kube_yaml_schema.state")
-local util = require("kube_yaml_schema.util")
 
 local M = {}
 

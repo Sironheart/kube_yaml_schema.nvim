@@ -21,13 +21,19 @@ jobs:
           neovim: true
           version: stable
 
+      - name: Install mise
+        uses: jdx/mise-action@v4
+        with:
+          install: false
+
       - name: Run smoke tests
-        run: nvim --headless -u NONE -l tests/smoke.lua
+        run: mise run smoke
 
       - name: Build release archive
-        run: |
-          mkdir -p dist
-          git archive --format=tar.gz --output="dist/${{ github.event.repository.name }}-${{ github.ref_name }}.tar.gz" HEAD
+        run: mise run release_archive
+        env:
+          REPO_NAME: ${{ github.event.repository.name }}
+          REF_NAME: ${{ github.ref_name }}
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2

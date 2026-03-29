@@ -28,6 +28,25 @@ jobs:
           version: latest
           args: --check .
 
+  selene:
+    name: Static analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install Selene
+        run: cargo install --locked selene
+
+      - name: Run Selene
+        run: selene lua tests
+
   smoke:
     name: Smoke (Neovim ${{ matrix.neovim-version }})
     runs-on: ubuntu-latest

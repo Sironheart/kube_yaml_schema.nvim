@@ -15,9 +15,8 @@ local function parse_value(raw)
     return nil
   end
 
-  if value:sub(1, 1) == '"' and value:sub(-1) == '"' then
-    value = value:sub(2, -2)
-  elseif value:sub(1, 1) == "'" and value:sub(-1) == "'" then
+  local quote = value:sub(1, 1)
+  if (quote == '"' or quote == "'") and value:sub(-1) == quote then
     value = value:sub(2, -2)
   end
 
