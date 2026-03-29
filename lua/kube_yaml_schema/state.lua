@@ -3,6 +3,8 @@ local constants = require("kube_yaml_schema.constants")
 ---@type KubeYamlSchemaState
 local M = {
   initialized = false,
+  commands_registered = false,
+  global_config_applied = false,
   opts = vim.deepcopy(constants.defaults),
   context = {
     value = nil,

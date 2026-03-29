@@ -46,20 +46,20 @@ mise run check
 
 ```lua
 {
-  'your-org/kube-yaml-schema.nvim',
+  'Sironheart/kube_yaml_schema.nvim',
   ft = { 'yaml', 'yaml.docker-compose', 'yaml.gitlab', 'yaml.helm-values' },
-  cmd = {
-    'KubeYamlSchemaRefresh',
-    'KubeYamlSchemaRefreshAll',
-    'KubeYamlSchemaContext',
-    'KubeYamlSchemaClearCache',
-  },
+  cmd = { 'KubeYamlSchema' },
   opts = {
     auto_refresh = true,
     cache_ttl_seconds = 300,
   },
 }
 ```
+
+The plugin auto-initializes when loaded. You can configure it via either:
+
+- `opts = { ... }` (`require('kube_yaml_schema').setup(opts)`), or
+- `vim.g.kube_yaml_schema = { ... }` (or a function returning that table).
 
 Then use in your `yamlls` config:
 
@@ -89,10 +89,19 @@ end
 
 ## Commands
 
-- `:KubeYamlSchemaRefresh` refresh current buffer.
-- `:KubeYamlSchemaRefreshAll` refresh all open YAML buffers.
-- `:KubeYamlSchemaContext` open context picker (active context preselected).
-- `:KubeYamlSchemaContext <name>` switch to explicit context.
-- `:KubeYamlSchemaContext auto` clear override and follow `kubectl current-context`.
-- `:KubeYamlSchemaContext current` show active context/cluster.
-- `:KubeYamlSchemaClearCache` clear on-disk and runtime cache.
+- `:KubeYamlSchema refresh` refresh current buffer.
+- `:KubeYamlSchema refresh-all` refresh all open YAML buffers.
+- `:KubeYamlSchema context` open context picker (active context preselected).
+- `:KubeYamlSchema context <name>` switch to explicit context.
+- `:KubeYamlSchema context auto` clear override and follow `kubectl current-context`.
+- `:KubeYamlSchema context current` show active context/cluster.
+- `:KubeYamlSchema clear-cache` clear on-disk and runtime cache.
+
+Legacy commands still work and emit deprecation warnings:
+
+- `:KubeYamlSchemaRefresh`
+- `:KubeYamlSchemaRefreshAll`
+- `:KubeYamlSchemaContext`
+- `:KubeYamlSchemaClearCache`
+
+Run `:checkhealth kube_yaml_schema` for troubleshooting.

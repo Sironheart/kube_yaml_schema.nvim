@@ -79,6 +79,8 @@
 
 ---@class KubeYamlSchemaState
 ---@field initialized boolean
+---@field commands_registered boolean
+---@field global_config_applied boolean
 ---@field opts KubeYamlSchemaNormalizedOptions
 ---@field context KubeYamlSchemaCurrentContextCache
 ---@field kubeconfig KubeYamlSchemaKubeconfigCache
@@ -136,6 +138,10 @@
 ---@class KubeYamlSchemaRefreshOpts
 ---@field notify boolean?
 
+---@class KubeYamlSchemaCommandSubcommand
+---@field impl fun(args: string[])
+---@field complete? fun(arg_lead: string): string[]
+
 ---@alias KubeYamlSchemaSystemCallback fun(result: vim.SystemCompleted)
 ---@alias KubeYamlSchemaWaiter fun(payload: any, err: string?)
 ---@alias KubeYamlSchemaContextWaiter fun(context: string?, err: string?)
@@ -147,3 +153,6 @@
 ---@alias KubeYamlSchemaCrdIndexWaiter fun(index: KubeYamlSchemaCrdIndex?, err: string?)
 ---@alias KubeYamlSchemaKubeconfigWaiter fun(data: KubeYamlSchemaKubeconfigCache?, err: string?)
 ---@alias KubeYamlSchemaResolveWaiter fun(result: KubeYamlSchemaResolveResult, err: string?)
+
+---@type KubeYamlSchemaOptionsInput | fun(): KubeYamlSchemaOptionsInput | nil
+vim.g.kube_yaml_schema = vim.g.kube_yaml_schema
