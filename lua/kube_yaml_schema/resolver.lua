@@ -4,6 +4,8 @@ local parser = require("kube_yaml_schema.parser")
 
 local M = {}
 
+---@param version string
+---@return string
 local function kubernetes_schema_uri(version)
   return string.format(
     "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/master/%s-standalone-strict/all.json",
@@ -11,6 +13,8 @@ local function kubernetes_schema_uri(version)
   )
 end
 
+---@param resource KubeYamlSchemaResource
+---@return string
 local function api_version(resource)
   if resource.group == "" then
     return resource.version
@@ -19,10 +23,15 @@ local function api_version(resource)
   return string.format("%s/%s", resource.group, resource.version)
 end
 
+---@param resource KubeYamlSchemaResource
+---@return string
 local function resource_key(resource)
   return string.lower(api_version(resource) .. "|" .. resource.kind)
 end
 
+---@param a KubeYamlSchemaResource
+---@param b KubeYamlSchemaResource
+---@return boolean
 local function resource_sort(a, b)
   local a_api_version = api_version(a)
   local b_api_version = api_version(b)
@@ -34,6 +43,8 @@ local function resource_sort(a, b)
   return a_api_version < b_api_version
 end
 
+---@param resources KubeYamlSchemaResource[]
+---@return KubeYamlSchemaResource[]
 local function dedupe_resources(resources)
   local unique = {}
 
@@ -46,6 +57,9 @@ local function dedupe_resources(resources)
   return deduped
 end
 
+---@param resource KubeYamlSchemaResource
+---@param uri string
+---@return table
 local function schema_rule(resource, uri)
   return {
     ["if"] = {
@@ -62,6 +76,8 @@ local function schema_rule(resource, uri)
   }
 end
 
+---@param entries KubeYamlSchemaResolverEntry[]
+---@return string, table
 local function compose_schema(entries)
   table.sort(entries, function(a, b)
     if a.rule_key == b.rule_key then
@@ -92,6 +108,9 @@ local function compose_schema(entries)
   return cache_key, schema
 end
 
+---@param list string[]
+---@param value string
+---@return nil
 local function append_unique(list, value)
   for _, item in ipairs(list) do
     if item == value then
@@ -102,6 +121,9 @@ local function append_unique(list, value)
   table.insert(list, value)
 end
 
+---@param bufnr integer
+---@param callback KubeYamlSchemaResolveWaiter
+---@return nil
 function M.resolve_for_buffer(bufnr, callback)
   local resources = dedupe_resources(parser.parse_kubernetes_resources(bufnr))
   if #resources == 0 then
@@ -125,6 +147,8 @@ function M.resolve_for_buffer(bufnr, callback)
       end
     end
 
+    ---@param next KubeYamlSchemaVersionWaiter
+    ---@return nil
     local function with_server_version(next)
       if core_count == 0 then
         next(nil, nil)
@@ -134,6 +158,8 @@ function M.resolve_for_buffer(bufnr, callback)
       kubectl.get_server_version(target, next)
     end
 
+    ---@param next KubeYamlSchemaCrdIndexWaiter
+    ---@return nil
     local function with_crd_index(next)
       if non_core_count == 0 then
         next(nil, nil)
@@ -145,7 +171,9 @@ function M.resolve_for_buffer(bufnr, callback)
 
     with_server_version(function(version, version_err)
       with_crd_index(function(index, crd_err)
+        ---@type KubeYamlSchemaResolverEntry[]
         local entries = {}
+        ---@type string[]
         local errors = {}
 
         if version_err then

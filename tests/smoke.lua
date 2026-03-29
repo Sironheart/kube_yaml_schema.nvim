@@ -4,16 +4,25 @@ local constants = require("kube_yaml_schema.constants")
 local parser = require("kube_yaml_schema.parser")
 local plugin = require("kube_yaml_schema")
 
+---@param message string
+---@return nil
 local function fail(message)
   error(message, 0)
 end
 
+---@param condition boolean
+---@param message string?
+---@return nil
 local function assert_true(condition, message)
   if not condition then
     fail(message or "expected condition to be true")
   end
 end
 
+---@param actual any
+---@param expected any
+---@param message string?
+---@return nil
 local function assert_equal(actual, expected, message)
   if not vim.deep_equal(actual, expected) then
     fail(
@@ -27,6 +36,7 @@ local function assert_equal(actual, expected, message)
   end
 end
 
+---@return nil
 local function run_parser_tests()
   assert_equal(
     { parser.parse_api_version("apps/v1") },
@@ -57,6 +67,7 @@ local function run_parser_tests()
   }, "parse_kubernetes_resources should detect valid manifests")
 end
 
+---@return nil
 local function run_options_tests()
   local normalized = constants.normalize_options({
     cache_ttl_seconds = -1,
@@ -76,6 +87,7 @@ local function run_options_tests()
   assert_true(normalized.context == nil, "empty context should normalize to nil")
 end
 
+---@return nil
 local function run_config_tests()
   local config = plugin.yamlls_config({
     settings = {

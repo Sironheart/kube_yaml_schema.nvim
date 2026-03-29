@@ -8,6 +8,9 @@ local util = require("kube_yaml_schema.util")
 
 local M = {}
 
+---@param changed boolean
+---@param base string
+---@return string
 local function fallback_message(changed, base)
   if changed then
     return base .. ", switched to Schema Store fallback"
@@ -16,6 +19,11 @@ local function fallback_message(changed, base)
   return base .. ", using Schema Store fallback"
 end
 
+---@param opts KubeYamlSchemaRefreshOpts
+---@param result KubeYamlSchemaResolveResult?
+---@param err string?
+---@param changed boolean
+---@return nil
 local function notify_resolution_result(opts, result, err, changed)
   if not opts.notify then
     return
@@ -43,7 +51,11 @@ local function notify_resolution_result(opts, result, err, changed)
   util.notify(vim.log.levels.INFO, fallback_message(changed, "No applicable cluster schema found"))
 end
 
+---@param bufnr integer
+---@param opts KubeYamlSchemaRefreshOpts?
+---@return nil
 local function refresh_buffer(bufnr, opts)
+  ---@type KubeYamlSchemaRefreshOpts
   opts = opts or {}
 
   if not vim.api.nvim_buf_is_valid(bufnr) then
@@ -76,6 +88,8 @@ local function refresh_buffer(bufnr, opts)
   end)
 end
 
+---@param opts KubeYamlSchemaRefreshOpts?
+---@return nil
 local function refresh_open_yaml_buffers(opts)
   for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_valid(bufnr) and vim.api.nvim_buf_is_loaded(bufnr) and util.is_yaml_filetype(bufnr) then
@@ -84,6 +98,8 @@ local function refresh_open_yaml_buffers(opts)
   end
 end
 
+---@param prefix string?
+---@return nil
 local function notify_active_target(prefix)
   kubectl.get_active_target(function(target, err)
     if not target then
@@ -103,6 +119,8 @@ local function notify_active_target(prefix)
   end)
 end
 
+---@param context string?
+---@return nil
 local function switch_context(context)
   kubectl.set_context_override(context)
   kubectl.clear_runtime_cache()
@@ -115,6 +133,7 @@ local function switch_context(context)
   end
 end
 
+---@return nil
 local function open_context_picker()
   kubectl.list_context_entries(function(entries, err)
     if not entries then
@@ -126,7 +145,9 @@ local function open_context_picker()
       local active_context = target and target.context or nil
       local override_context = kubectl.get_context_override()
 
+      ---@type KubeYamlSchemaContextSelectItem[]
       local items = {}
+      ---@type KubeYamlSchemaContextSelectItem?
       local preselected_item = nil
 
       for _, entry in ipairs(entries) do
@@ -140,6 +161,7 @@ local function open_context_picker()
         end
 
         local suffix = #flags > 0 and (" [" .. table.concat(flags, ", ") .. "]") or ""
+        ---@type KubeYamlSchemaContextSelectItem
         local item = {
           label = string.format("%s (%s)%s", entry.context, entry.cluster, suffix),
           value = entry.context,
@@ -155,6 +177,7 @@ local function open_context_picker()
         end
       end
 
+      ---@type KubeYamlSchemaContextSelectItem
       local auto_item = {
         label = "auto (follow kubectl current-context)",
         value = nil,
@@ -179,10 +202,13 @@ local function open_context_picker()
         prompt = "Select kube context",
         kind = "kube-yaml-schema-context",
         default = preselected_item,
+        ---@param item KubeYamlSchemaContextSelectItem
+        ---@return string
         format_item = function(item)
           return item.label
         end,
       }, function(choice)
+        ---@cast choice KubeYamlSchemaContextSelectItem?
         if choice then
           switch_context(choice.value)
         end
@@ -191,7 +217,9 @@ local function open_context_picker()
   end)
 end
 
+---@return string[]
 local function context_completion_items()
+  ---@type string[]
   local values = {
     "auto",
     "current",
@@ -204,12 +232,16 @@ local function context_completion_items()
   return values
 end
 
+---@param arg_lead string
+---@return string[]
 local function context_completion(arg_lead)
   return vim.tbl_filter(function(item)
     return vim.startswith(item, arg_lead)
   end, context_completion_items())
 end
 
+---@param arg string?
+---@return nil
 local function handle_context_command(arg)
   local value = vim.trim(arg or "")
 
@@ -244,18 +276,27 @@ local function handle_context_command(arg)
   end)
 end
 
+---@param bufnr integer?
+---@param opts KubeYamlSchemaRefreshOpts?
+---@return nil
 function M.refresh(bufnr, opts)
   refresh_buffer(bufnr or vim.api.nvim_get_current_buf(), opts)
 end
 
+---@param opts KubeYamlSchemaRefreshOpts?
+---@return nil
 function M.refresh_all(opts)
   refresh_open_yaml_buffers(opts)
 end
 
+---@param context string?
+---@return nil
 function M.set_context(context)
   switch_context(context)
 end
 
+---@param extra table?
+---@return table
 function M.yamlls_config(extra)
   local config = {
     settings = {
@@ -289,7 +330,10 @@ function M.yamlls_config(extra)
   return config
 end
 
+---@param opts KubeYamlSchemaOptionsInput?
+---@return nil
 function M.setup(opts)
+  ---@type KubeYamlSchemaNormalizedOptions
   local merged = vim.tbl_deep_extend("force", vim.deepcopy(state.opts), opts or {})
   state.opts = constants.normalize_options(merged)
 
@@ -303,6 +347,7 @@ function M.setup(opts)
 
   vim.api.nvim_create_autocmd("LspAttach", {
     group = group,
+    ---@param args vim.api.keyset.create_autocmd.callback_args
     callback = function(args)
       local client = vim.lsp.get_client_by_id(args.data.client_id)
       if not client or client.name ~= "yamlls" then
@@ -316,6 +361,7 @@ function M.setup(opts)
 
   vim.api.nvim_create_autocmd("LspDetach", {
     group = group,
+    ---@param args vim.api.keyset.create_autocmd.callback_args
     callback = function(args)
       if args.data and args.data.client_id then
         lsp.remove_client_state(args.data.client_id)
@@ -326,6 +372,7 @@ function M.setup(opts)
   if state.opts.auto_refresh then
     vim.api.nvim_create_autocmd(state.opts.refresh_events, {
       group = group,
+      ---@param args vim.api.keyset.create_autocmd.callback_args
       callback = function(args)
         if util.is_yaml_filetype(args.buf) then
           refresh_buffer(args.buf, { notify = state.opts.notify_on_auto_refresh })
@@ -336,6 +383,7 @@ function M.setup(opts)
 
   vim.api.nvim_create_autocmd("BufWipeout", {
     group = group,
+    ---@param args vim.api.keyset.create_autocmd.callback_args
     callback = function(args)
       lsp.remove_buffer_overrides(args.buf)
       state.refresh_tokens[args.buf] = nil
@@ -355,6 +403,7 @@ function M.setup(opts)
   })
 
   vim.api.nvim_create_user_command("KubeYamlSchemaContext", function(args)
+    ---@cast args vim.api.keyset.user_command.command_args
     handle_context_command(args.args)
   end, {
     nargs = "?",

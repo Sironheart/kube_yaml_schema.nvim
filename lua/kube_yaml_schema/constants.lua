@@ -1,5 +1,6 @@
 local M = {}
 
+---@type table<string, boolean>
 M.core_api_groups = {
   [""] = true,
   ["admissionregistration.k8s.io"] = true,
@@ -20,6 +21,7 @@ M.core_api_groups = {
   ["storage.k8s.io"] = true,
 }
 
+---@type KubeYamlSchemaNormalizedOptions
 M.defaults = {
   kubectl_bin = "kubectl",
   kubectl_timeout_ms = 5000,
@@ -34,6 +36,8 @@ M.defaults = {
   notify = true,
 }
 
+---@param opts KubeYamlSchemaOptionsInput?
+---@return number
 local function parse_cache_ttl(opts)
   local default_ttl = M.defaults.cache_ttl_seconds
   local raw = opts and opts.cache_ttl_seconds or nil
@@ -52,7 +56,10 @@ local function parse_cache_ttl(opts)
   return default_ttl
 end
 
+---@param opts KubeYamlSchemaOptionsInput?
+---@return KubeYamlSchemaNormalizedOptions
 function M.normalize_options(opts)
+  ---@type KubeYamlSchemaNormalizedOptions
   local normalized = vim.tbl_deep_extend("force", vim.deepcopy(M.defaults), opts or {})
 
   local cache_ttl = parse_cache_ttl(opts)

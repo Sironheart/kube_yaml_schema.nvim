@@ -1,5 +1,6 @@
 local constants = require("kube_yaml_schema.constants")
 
+---@type KubeYamlSchemaState
 local M = {
   initialized = false,
   opts = vim.deepcopy(constants.defaults),
@@ -21,6 +22,7 @@ local M = {
   client_states = {},
 }
 
+---@return nil
 function M.reset_runtime()
   M.context = {
     value = nil,

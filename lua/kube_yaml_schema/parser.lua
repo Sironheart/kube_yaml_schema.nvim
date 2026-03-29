@@ -2,6 +2,8 @@ local constants = require("kube_yaml_schema.constants")
 
 local M = {}
 
+---@param raw string?
+---@return string?
 local function parse_value(raw)
   if not raw then
     return nil
@@ -27,6 +29,8 @@ local function parse_value(raw)
   return value
 end
 
+---@param api_version string?
+---@return string, string
 function M.parse_api_version(api_version)
   if not api_version or api_version == "" then
     return "", ""
@@ -40,12 +44,17 @@ function M.parse_api_version(api_version)
   return "", api_version
 end
 
+---@param bufnr integer
+---@return KubeYamlSchemaResource[]
 function M.parse_kubernetes_resources(bufnr)
   local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
 
+  ---@type KubeYamlSchemaResource[]
   local resources = {}
+  ---@type { kind?: string, api_version?: string }
   local current = {}
 
+  ---@return nil
   local function flush_resource()
     if current.kind and current.api_version then
       local group, version = M.parse_api_version(current.api_version)

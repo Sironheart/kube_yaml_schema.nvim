@@ -3,6 +3,9 @@ local state = require("kube_yaml_schema.state")
 
 local M = {}
 
+---@param args string[]
+---@param callback KubeYamlSchemaSystemCallback
+---@return nil
 local function run_kubectl(args, callback)
   local command = { state.opts.kubectl_bin }
   vim.list_extend(command, args)
@@ -14,18 +17,27 @@ local function run_kubectl(args, callback)
   end)
 end
 
+---@param context string
+---@param args string[]
+---@param callback KubeYamlSchemaSystemCallback
+---@return nil
 local function run_kubectl_for_context(context, args, callback)
   local full_args = { "--context", context }
   vim.list_extend(full_args, args)
   run_kubectl(full_args, callback)
 end
 
+---@param waiters table<integer, fun(payload: any, err: string?)>
+---@param payload any
+---@param err string?
+---@return nil
 local function flush_waiters(waiters, payload, err)
   for _, waiter in ipairs(waiters) do
     waiter(payload, err)
   end
 end
 
+---@return number
 local function cache_ttl()
   local value = state.opts.cache_ttl_seconds
   if type(value) ~= "number" then
@@ -35,6 +47,8 @@ local function cache_ttl()
   return value
 end
 
+---@param ttl_seconds number
+---@return number
 local function expires_at(ttl_seconds)
   if ttl_seconds == 0 then
     return math.huge
@@ -43,6 +57,7 @@ local function expires_at(ttl_seconds)
   return os.time() + ttl_seconds
 end
 
+---@return number
 local function stale_ttl()
   local configured = state.opts.stale_on_error_seconds
   if configured > 0 then
@@ -52,6 +67,8 @@ local function stale_ttl()
   return 60
 end
 
+---@param output string
+---@return string?
 local function parse_server_version(output)
   local ok, decoded = pcall(vim.json.decode, output)
   if not ok or type(decoded) ~= "table" or type(decoded.serverVersion) ~= "table" then
@@ -75,6 +92,8 @@ local function parse_server_version(output)
   return "v" .. git_version
 end
 
+---@param output string
+---@return KubeYamlSchemaKubeconfigParsed?
 local function parse_contexts(output)
   local ok, decoded = pcall(vim.json.decode, output)
   if not ok or type(decoded) ~= "table" then
@@ -104,7 +123,10 @@ local function parse_contexts(output)
   }
 end
 
+---@param crd_payload table?
+---@return KubeYamlSchemaCrdIndex
 local function build_crd_index(crd_payload)
+  ---@type KubeYamlSchemaCrdIndex
   local index = {
     by_key = {},
   }
@@ -149,6 +171,8 @@ local function build_crd_index(crd_payload)
   return index
 end
 
+---@param callback KubeYamlSchemaKubeconfigWaiter
+---@return nil
 local function get_kubeconfig_data(callback)
   local configured_ttl = cache_ttl()
   local cached = state.kubeconfig
@@ -163,10 +187,12 @@ local function get_kubeconfig_data(callback)
     return
   end
 
+  ---@type KubeYamlSchemaKubeconfigWaiter[]
   state.kubeconfig_inflight = { callback }
 
   run_kubectl({ "config", "view", "-o", "json" }, function(result)
-    local waiters = state.kubeconfig_inflight
+    ---@type KubeYamlSchemaKubeconfigWaiter[]
+    local waiters = state.kubeconfig_inflight or {}
     state.kubeconfig_inflight = nil
 
     if result.code ~= 0 then
@@ -190,12 +216,21 @@ local function get_kubeconfig_data(callback)
       return
     end
 
-    parsed.expires_at = expires_at(configured_ttl)
-    state.kubeconfig = parsed
-    flush_waiters(waiters, parsed, nil)
+    ---@type KubeYamlSchemaKubeconfigCache
+    local next_cached = {
+      contexts = parsed.contexts,
+      context_to_cluster = parsed.context_to_cluster,
+      expires_at = expires_at(configured_ttl),
+    }
+
+    state.kubeconfig = next_cached
+    flush_waiters(waiters, next_cached, nil)
   end)
 end
 
+---@param entry KubeYamlSchemaCrdIndexEntry?
+---@param requested_version string?
+---@return table?, string?
 function M.pick_crd_schema(entry, requested_version)
   if not entry then
     return nil, nil
@@ -232,10 +267,13 @@ function M.pick_crd_schema(entry, requested_version)
   return nil, nil
 end
 
+---@return string?
 function M.get_context_override()
   return state.opts.context
 end
 
+---@param context string?
+---@return nil
 function M.set_context_override(context)
   if type(context) == "string" and context ~= "" then
     state.opts.context = context
@@ -249,6 +287,8 @@ function M.set_context_override(context)
   }
 end
 
+---@param callback KubeYamlSchemaContextWaiter
+---@return nil
 function M.get_current_context(callback)
   local override = M.get_context_override()
   if override then
@@ -279,6 +319,8 @@ function M.get_current_context(callback)
   end)
 end
 
+---@param callback KubeYamlSchemaTargetWaiter
+---@return nil
 function M.get_active_target(callback)
   M.get_current_context(function(context, context_err)
     if not context then
@@ -300,6 +342,8 @@ function M.get_active_target(callback)
   end)
 end
 
+---@param callback KubeYamlSchemaContextEntriesWaiter
+---@return nil
 function M.list_context_entries(callback)
   get_kubeconfig_data(function(data, err)
     if not data then
@@ -307,8 +351,10 @@ function M.list_context_entries(callback)
       return
     end
 
+    ---@type KubeYamlSchemaContextEntry[]
     local entries = {}
-    for _, context in ipairs(data.contexts) do
+    local contexts = data.contexts or {}
+    for _, context in ipairs(contexts) do
       local cluster = data.context_to_cluster and data.context_to_cluster[context] or context
       table.insert(entries, {
         context = context,
@@ -320,6 +366,8 @@ function M.list_context_entries(callback)
   end)
 end
 
+---@param callback KubeYamlSchemaContextsWaiter
+---@return nil
 function M.list_contexts(callback)
   M.list_context_entries(function(entries, err)
     if not entries then
@@ -336,6 +384,7 @@ function M.list_contexts(callback)
   end)
 end
 
+---@return string[]
 function M.list_contexts_sync()
   local result = vim
     .system(
@@ -353,6 +402,9 @@ function M.list_contexts_sync()
   return contexts
 end
 
+---@param name string
+---@param callback KubeYamlSchemaExistsWaiter
+---@return nil
 function M.context_exists(name, callback)
   if type(name) ~= "string" or name == "" then
     callback(false, "context cannot be empty")
@@ -369,6 +421,9 @@ function M.context_exists(name, callback)
   end)
 end
 
+---@param target KubeYamlSchemaTarget
+---@param callback KubeYamlSchemaVersionWaiter
+---@return nil
 function M.get_server_version(target, callback)
   local cache_key = target.cluster
   local cached = state.version_cache[cache_key]
@@ -398,10 +453,12 @@ function M.get_server_version(target, callback)
     return
   end
 
+  ---@type KubeYamlSchemaVersionWaiter[]
   state.version_inflight[cache_key] = { callback }
 
   run_kubectl_for_context(target.context, { "version", "--output=json" }, function(result)
-    local waiters = state.version_inflight[cache_key]
+    ---@type KubeYamlSchemaVersionWaiter[]
+    local waiters = state.version_inflight[cache_key] or {}
     state.version_inflight[cache_key] = nil
 
     if result.code ~= 0 then
@@ -434,6 +491,9 @@ function M.get_server_version(target, callback)
   end)
 end
 
+---@param target KubeYamlSchemaTarget
+---@param callback KubeYamlSchemaCrdIndexWaiter
+---@return nil
 function M.get_crd_index(target, callback)
   local cache_key = target.cluster
   local cached = state.crd_cache[cache_key]
@@ -444,6 +504,9 @@ function M.get_crd_index(target, callback)
 
   local cache_path = cache.cluster_crd_cache_path(cache_key)
   local stale = cache.read_json_file(cache_path)
+  if stale and type(stale.by_key) ~= "table" then
+    stale = nil
+  end
   local configured_ttl = cache_ttl()
 
   if stale and cache.is_cache_fresh(cache_path, configured_ttl) then
@@ -460,10 +523,12 @@ function M.get_crd_index(target, callback)
     return
   end
 
+  ---@type KubeYamlSchemaCrdIndexWaiter[]
   state.crd_inflight[cache_key] = { callback }
 
   run_kubectl_for_context(target.context, { "get", "crd", "--output=json" }, function(result)
-    local waiters = state.crd_inflight[cache_key]
+    ---@type KubeYamlSchemaCrdIndexWaiter[]
+    local waiters = state.crd_inflight[cache_key] or {}
     state.crd_inflight[cache_key] = nil
 
     if result.code ~= 0 then
@@ -497,6 +562,7 @@ function M.get_crd_index(target, callback)
   end)
 end
 
+---@return nil
 function M.clear_runtime_cache()
   state.reset_runtime()
 end
