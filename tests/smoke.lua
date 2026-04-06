@@ -65,6 +65,37 @@ local function run_parser_tests()
     { group = "apps", version = "v1", kind = "Deployment", core = true },
     { group = "batch", version = "v1", kind = "CronJob", core = true },
   }, "parse_kubernetes_resources should detect valid manifests")
+
+  local nested_bufnr = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_buf_set_lines(nested_bufnr, 0, -1, false, {
+    "apiVersion: tuppr.home-operations.com/v1alpha1",
+    "kind: KubernetesUpgrade",
+    "spec:",
+    "  healthChecks:",
+    "    - apiVersion: v1",
+    "      kind: Node",
+    "    - apiVersion: volsync.backube/v1alpha1",
+    "      kind: ReplicationSource",
+    "    - apiVersion: ceph.rook.io/v1",
+    "      kind: CephCluster",
+  })
+
+  assert_equal(parser.parse_kubernetes_resources(nested_bufnr), {
+    { group = "tuppr.home-operations.com", version = "v1alpha1", kind = "KubernetesUpgrade", core = false },
+  }, "parse_kubernetes_resources should keep the top-level manifest resource")
+
+  assert_equal(
+    parser.summarize_resources({
+      { group = "", version = "v1", kind = "Service", core = true },
+      { group = "apps", version = "v1", kind = "Deployment", core = true },
+      { group = "batch", version = "v1", kind = "CronJob", core = true },
+      { group = "networking.k8s.io", version = "v1", kind = "Ingress", core = true },
+      { group = "rbac.authorization.k8s.io", version = "v1", kind = "Role", core = true },
+      { group = "", version = "v1", kind = "ConfigMap", core = true },
+    }),
+    "detected 6 resources: v1 Service, apps/v1 Deployment, batch/v1 CronJob, networking.k8s.io/v1 Ingress, rbac.authorization.k8s.io/v1 Role, +1 more",
+    "summarize_resources should produce concise debug output"
+  )
 end
 
 ---@return nil

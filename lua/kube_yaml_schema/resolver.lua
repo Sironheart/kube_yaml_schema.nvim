@@ -121,19 +121,97 @@ local function append_unique(list, value)
   table.insert(list, value)
 end
 
+---@param resource KubeYamlSchemaResource
+---@param target KubeYamlSchemaTarget
+---@param version string?
+---@param index KubeYamlSchemaCrdIndex?
+---@param errors string[]
+---@param persist boolean
+---@return KubeYamlSchemaResolverEntry?
+local function resolve_resource_entry(resource, target, version, index, errors, persist)
+  if resource.core then
+    if not version then
+      return nil
+    end
+
+    return {
+      rule_key = resource_key(resource),
+      resource = resource,
+      uri = kubernetes_schema_uri(version),
+      name = "Kubernetes " .. version,
+    }
+  end
+
+  if not (index and index.by_key) then
+    return nil
+  end
+
+  local key = string.lower(resource.group .. "|" .. resource.kind)
+  local crd_entry = index.by_key[key]
+  if not crd_entry then
+    return nil
+  end
+
+  local schema_body, schema_version = kubectl.pick_crd_schema(crd_entry, resource.version)
+  if not (schema_body and schema_version) then
+    return nil
+  end
+
+  local entry = {
+    rule_key = resource_key(resource),
+    resource = resource,
+    uri = "",
+    name = string.format("%s %s/%s", crd_entry.kind, crd_entry.group, schema_version),
+  }
+
+  if not persist then
+    return entry
+  end
+
+  local uri = cache.persist_schema(target.cluster, crd_entry.group, crd_entry.kind, schema_version, schema_body)
+  if not uri then
+    append_unique(errors, "failed to persist CRD schema to cache")
+    return nil
+  end
+
+  entry.uri = uri
+  return entry
+end
+
+---@param resources KubeYamlSchemaResource[]
+---@param target KubeYamlSchemaTarget
+---@param version string?
+---@param index KubeYamlSchemaCrdIndex?
+---@param errors string[]
+---@param persist boolean
+---@return KubeYamlSchemaResolverEntry[]
+local function resolve_resource_entries(resources, target, version, index, errors, persist)
+  local entries = {}
+
+  for _, resource in ipairs(resources) do
+    local entry = resolve_resource_entry(resource, target, version, index, errors, persist)
+    if entry then
+      table.insert(entries, entry)
+    end
+  end
+
+  return entries
+end
+
 ---@param bufnr integer
 ---@param callback KubeYamlSchemaResolveWaiter
 ---@return nil
 function M.resolve_for_buffer(bufnr, callback)
-  local resources = dedupe_resources(parser.parse_kubernetes_resources(bufnr))
+  local parsed_resources = parser.parse_kubernetes_resources(bufnr)
+  local resources = dedupe_resources(parsed_resources)
   if #resources == 0 then
-    callback({ reason = "no-kubernetes-resource" }, nil)
+    callback({ reason = "no-kubernetes-resource", resources = parsed_resources }, nil)
     return
   end
 
   kubectl.get_active_target(function(target, target_err)
     if not target then
-      callback({ reason = "context-unavailable" }, target_err)
+      callback({ reason = "context-unavailable", resources = parsed_resources }, target_err)
       return
     end
 
@@ -171,8 +249,6 @@ function M.resolve_for_buffer(bufnr, callback)
 
     with_server_version(function(version, version_err)
       with_crd_index(function(index, crd_err)
-        ---@type KubeYamlSchemaResolverEntry[]
-        local entries = {}
         ---@type string[]
         local errors = {}
 
@@ -184,46 +260,13 @@ function M.resolve_for_buffer(bufnr, callback)
           append_unique(errors, crd_err)
         end
 
-        for _, resource in ipairs(resources) do
-          if resource.core then
-            if version then
-              table.insert(entries, {
-                rule_key = resource_key(resource),
-                resource = resource,
-                uri = kubernetes_schema_uri(version),
-                name = "Kubernetes " .. version,
-              })
-            end
-          elseif index and index.by_key then
-            local key = string.lower(resource.group .. "|" .. resource.kind)
-            local crd_entry = index.by_key[key]
-
-            if crd_entry then
-              local schema_body, schema_version = kubectl.pick_crd_schema(crd_entry, resource.version)
-              if schema_body and schema_version then
-                local uri =
-                  cache.persist_schema(target.cluster, crd_entry.group, crd_entry.kind, schema_version, schema_body)
-
-                if uri then
-                  table.insert(entries, {
-                    rule_key = resource_key(resource),
-                    resource = resource,
-                    uri = uri,
-                    name = string.format("%s %s/%s", crd_entry.kind, crd_entry.group, schema_version),
-                  })
-                else
-                  append_unique(errors, "failed to persist CRD schema to cache")
-                end
-              end
-            end
-          end
-        end
+        local entries = resolve_resource_entries(resources, target, version, index, errors, true)
 
         if #entries == 0 then
           if #errors > 0 then
-            callback({ reason = "resolution-error" }, table.concat(errors, "; "))
+            callback({ reason = "resolution-error", resources = parsed_resources }, table.concat(errors, "; "))
           else
-            callback({ reason = "no-cluster-schema" }, nil)
+            callback({ reason = "no-cluster-schema", resources = parsed_resources }, nil)
           end
           return
         end
@@ -231,6 +274,7 @@ function M.resolve_for_buffer(bufnr, callback)
         if #entries == 1 then
           callback({
             reason = "single-schema",
+            resources = parsed_resources,
             schema = {
               name = entries[1].name,
               uri = entries[1].uri,
@@ -242,7 +286,10 @@ function M.resolve_for_buffer(bufnr, callback)
         local cache_key, schema = compose_schema(entries)
         local composed_uri = cache.persist_generated_schema(target.cluster, cache_key, schema)
         if not composed_uri then
-          callback({ reason = "cache-write-failed" }, "failed to persist composed schema to cache")
+          callback(
+            { reason = "cache-write-failed", resources = parsed_resources },
+            "failed to persist composed schema to cache"
+          )
           return
         end
 
@@ -255,6 +302,7 @@ function M.resolve_for_buffer(bufnr, callback)
 
         callback({
           reason = "multi-document",
+          resources = parsed_resources,
           schema = {
             name = schema_name,
             uri = composed_uri,

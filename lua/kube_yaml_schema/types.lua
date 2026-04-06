@@ -128,6 +128,7 @@
 ---@class KubeYamlSchemaResolveResult
 ---@field reason KubeYamlSchemaResolveReason
 ---@field schema KubeYamlSchemaResolvedSchema?
+---@field resources KubeYamlSchemaResource[]?
 
 ---@class KubeYamlSchemaResolverEntry
 ---@field rule_key string
