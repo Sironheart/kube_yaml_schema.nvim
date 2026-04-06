@@ -79,13 +79,7 @@ If you are **really lazy** and use [LazyVim](https://lazyvim.org), do this:
 ```lua
 return {
   "Sironheart/kube_yaml_schema.nvim",
-  ft = { "yaml", "yaml.docker-compose", "yaml.gitlab", "yaml.helm-values" },
-  cmd = {
-    "KubeYamlSchemaRefresh",
-    "KubeYamlSchemaRefreshAll",
-    "KubeYamlSchemaContext",
-    "KubeYamlSchemaClearCache",
-  },
+  cmd = { 'KubeYamlSchema' },
   opts = {
     auto_refresh = true,
     cache_ttl_seconds = 300,
@@ -94,18 +88,7 @@ return {
     -- Setup the plugin
     require("kube-yaml-schema").setup(opts)
 
-    local lspconfig = require("lspconfig")
-    if lspconfig.yamlls then
-      lspconfig.yamlls.setup({
-        before_init = function(_, new_config)
-          new_config.settings.yaml.schemas = vim.tbl_deep_extend(
-            "force",
-            new_config.settings.yaml.schemas or {},
-            require("kube-yaml-schema").yamlls_config()
-          )
-        end,
-      })
-    end
+    vim.lsp.config('yamlls', require('kube_yaml_schema').yamlls_config())
   end,
 }
 ```
