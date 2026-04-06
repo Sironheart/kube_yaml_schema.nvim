@@ -73,7 +73,7 @@ end
 
 If you are **really lazy** and use [LazyVim](https://lazyvim.org), do this:
 
-- You probably already have the YAML Extra enabled. If not, enable it.
+- You probably already have [the YAML Extra](https://www.lazyvim.org/extras/lang/yaml) enabled. If not, enable it.
 - Inside your neovim config directory, in `lua/plugins`, add `kube-yaml-schema.lua` with these contents:
 
 ```lua
