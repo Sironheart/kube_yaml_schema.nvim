@@ -2,6 +2,7 @@ local cache = require("kube_yaml_schema.cache")
 local constants = require("kube_yaml_schema.constants")
 local kubectl = require("kube_yaml_schema.kubectl")
 local lsp = require("kube_yaml_schema.lsp")
+local parser = require("kube_yaml_schema.parser")
 local resolver = require("kube_yaml_schema.resolver")
 local state = require("kube_yaml_schema.state")
 local util = require("kube_yaml_schema.util")
@@ -35,6 +36,30 @@ local function fallback_message(changed, base)
   return base .. ", using Schema Store fallback"
 end
 
+---@param message string
+---@param result KubeYamlSchemaResolveResult?
+---@return string
+local function append_resource_summary(message, result)
+  local resources = result and result.resources or nil
+  if type(resources) ~= "table" or #resources == 0 then
+    return message
+  end
+
+  local max_items = 5
+  local lines = { message, "", (#resources == 1 and "Detected resource:" or "Detected resources:") }
+
+  for index, resource in ipairs(resources) do
+    if index > max_items then
+      table.insert(lines, string.format("- +%d more", #resources - max_items))
+      break
+    end
+
+    table.insert(lines, "- " .. parser.format_resource(resource))
+  end
+
+  return table.concat(lines, "\n")
+end
+
 ---@param opts KubeYamlSchemaRefreshOpts
 ---@param result KubeYamlSchemaResolveResult?
 ---@param err string?
@@ -46,25 +71,33 @@ local function notify_resolution_result(opts, result, err, changed)
   end
 
   if err then
-    util.notify(vim.log.levels.WARN, fallback_message(changed, "Failed to resolve Kubernetes schema") .. ": " .. err)
+    util.notify(
+      vim.log.levels.WARN,
+      append_resource_summary(
+        table.concat({ fallback_message(changed, "Failed to resolve Kubernetes schema"), "Error: " .. err }, "\n"),
+        result
+      )
+    )
     return
   end
 
   local schema = result and result.schema or nil
   if schema then
-    local action = changed and "Applied" or "Kept"
-    util.notify(vim.log.levels.INFO, string.format("%s schema override: %s", action, schema.name))
+    util.notify(vim.log.levels.INFO, append_resource_summary("Use schema override\nSchema: " .. schema.name, result))
     return
   end
 
   local reason = result and result.reason or "no-cluster-schema"
   if reason == "no-kubernetes-resource" then
     local message = changed and "Cleared Kubernetes schema override" or "No Kubernetes resource detected"
-    util.notify(vim.log.levels.INFO, message .. ", using Schema Store fallback")
+    util.notify(vim.log.levels.INFO, append_resource_summary(message .. ", using Schema Store fallback", result))
     return
   end
 
-  util.notify(vim.log.levels.INFO, fallback_message(changed, "No applicable cluster schema found"))
+  util.notify(
+    vim.log.levels.INFO,
+    append_resource_summary(fallback_message(changed, "No applicable cluster schema found"), result)
+  )
 end
 
 ---@param bufnr integer
