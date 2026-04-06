@@ -69,6 +69,49 @@ yamlls = function()
 end
 ```
 
+## Lazyvim setup
+
+If you are **really lazy** and use [LazyVim](https://lazyvim.org), do this:
+
+- You probably already have the YAML Extra enabled. If not, enable it.
+- Inside your neovim config directory, in `lua/plugins`, add `kube-yaml-schema.lua` with these contents:
+
+```lua
+return {
+  "Sironheart/kube_yaml_schema.nvim",
+  ft = { "yaml", "yaml.docker-compose", "yaml.gitlab", "yaml.helm-values" },
+  cmd = {
+    "KubeYamlSchemaRefresh",
+    "KubeYamlSchemaRefreshAll",
+    "KubeYamlSchemaContext",
+    "KubeYamlSchemaClearCache",
+  },
+  opts = {
+    auto_refresh = true,
+    cache_ttl_seconds = 300,
+  },
+  config = function(_, opts)
+    -- Setup the plugin
+    require("kube-yaml-schema").setup(opts)
+
+    local lspconfig = require("lspconfig")
+    if lspconfig.yamlls then
+      lspconfig.yamlls.setup({
+        before_init = function(_, new_config)
+          new_config.settings.yaml.schemas = vim.tbl_deep_extend(
+            "force",
+            new_config.settings.yaml.schemas or {},
+            require("kube-yaml-schema").yamlls_config()
+          )
+        end,
+      })
+    end
+  end,
+}
+```
+
+This takes care of adding kube_yaml_schema.nvim plugin and configuring `yamlls`, all in one file.
+
 ## Options
 
 ```lua
