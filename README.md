@@ -46,7 +46,7 @@ mise run check
 
 ```lua
 {
-  'your-org/kube-yaml-schema.nvim',
+  'Sironheart/kube_yaml_schema.nvim',
   ft = { 'yaml', 'yaml.docker-compose', 'yaml.gitlab', 'yaml.helm-values' },
   cmd = {
     'KubeYamlSchemaRefresh',
