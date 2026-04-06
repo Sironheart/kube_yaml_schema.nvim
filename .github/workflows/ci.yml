@@ -45,7 +45,7 @@ jobs:
         run: cargo install --locked selene
 
       - name: Run Selene
-        run: selene lua tests
+        run: selene lua tests plugin
 
   smoke:
     name: Smoke (Neovim ${{ matrix.neovim-version }})

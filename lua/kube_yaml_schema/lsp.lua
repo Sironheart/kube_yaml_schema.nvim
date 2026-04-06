@@ -3,6 +3,17 @@ local state = require("kube_yaml_schema.state")
 local M = {}
 
 ---@param client vim.lsp.Client
+---@param settings table
+---@return nil
+local function notify_configuration_changed(client, settings)
+  if client.is_stopped and client:is_stopped() then
+    return
+  end
+
+  pcall(client.notify, client, "workspace/didChangeConfiguration", { settings = settings })
+end
+
+---@param client vim.lsp.Client
 ---@return table<string, any>
 local function normalize_base_schemas(client)
   local schemas = ((client.settings or {}).yaml or {}).schemas
@@ -40,7 +51,7 @@ local function merge_schema_overrides(client, client_state)
 
   client.settings = settings
   client_state.last_applied = encoded
-  client:notify("workspace/didChangeConfiguration", { settings = settings })
+  notify_configuration_changed(client, settings)
 end
 
 ---@param bufnr integer
