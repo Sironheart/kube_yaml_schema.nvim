@@ -1,4 +1,5 @@
 local M = {}
+local unpack = unpack or table.unpack
 
 ---@type table<string, boolean>
 M.core_api_groups = {
@@ -55,8 +56,14 @@ M.option_keys = {
 ---@param spec table<string, table>
 ---@return boolean, string?
 local function validate_path(path, spec)
-  local ok, err = pcall(vim.validate, spec)
-  return ok, err and (path .. "." .. err)
+  for key, rule in pairs(spec) do
+    local ok, err = pcall(vim.validate, path .. "." .. key, unpack(rule))
+    if not ok then
+      return false, err
+    end
+  end
+
+  return true, nil
 end
 
 ---@param value any

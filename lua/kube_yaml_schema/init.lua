@@ -572,6 +572,26 @@ local function ensure_initialized()
   end
 end
 
+---@return table?
+local function resolve_schemastore_yaml_schemas()
+  local ok, schemastore_plugin = pcall(require, "schemastore")
+  if not ok then
+    return nil
+  end
+
+  local schemastore_yaml = type(schemastore_plugin) == "table" and schemastore_plugin.yaml or nil
+  if type(schemastore_yaml) ~= "table" or type(schemastore_yaml.schemas) ~= "function" then
+    return nil
+  end
+
+  local ok_schemas, schemastore_yaml_schemas = pcall(schemastore_yaml.schemas)
+  if not ok_schemas or type(schemastore_yaml_schemas) ~= "table" then
+    return nil
+  end
+
+  return schemastore_yaml_schemas
+end
+
 ---@param bufnr integer?
 ---@param opts KubeYamlSchemaRefreshOpts?
 ---@return nil
@@ -599,6 +619,15 @@ end
 function M.yamlls_config(extra)
   apply_global_options_once()
 
+  local schemastore_yaml_schemas = resolve_schemastore_yaml_schemas()
+  local yamlls_schema_store = schemastore_yaml_schemas and {
+    enable = false,
+    url = "",
+  } or {
+    enable = true,
+    url = state.opts.schema_store_url,
+  }
+
   local config = {
     settings = {
       redhat = {
@@ -612,14 +641,11 @@ function M.yamlls_config(extra)
           enable = true,
         },
         hover = true,
-        schemaStore = {
-          enable = true,
-          url = state.opts.schema_store_url,
-        },
+        schemaStore = yamlls_schema_store,
         schemaDownload = {
           enable = true,
         },
-        schemas = {},
+        schemas = schemastore_yaml_schemas or {},
       },
     },
   }

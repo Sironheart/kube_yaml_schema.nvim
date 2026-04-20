@@ -147,6 +147,40 @@ local function run_config_tests()
     config.settings.yaml.schemaStore.url == constants.defaults.schema_store_url,
     "yamlls_config should keep default schema store URL"
   )
+
+  local original_loaded = package.loaded.schemastore
+  local original_preload = package.preload.schemastore
+
+  package.loaded.schemastore = nil
+  package.preload.schemastore = function()
+    return {
+      yaml = {
+        schemas = function()
+          return {
+            ["https://example.com/test.schema.json"] = "kustomization.yaml",
+          }
+        end,
+      },
+    }
+  end
+
+  local schemastore_config = plugin.yamlls_config()
+
+  assert_true(
+    schemastore_config.settings.yaml.schemaStore.enable == false,
+    "yamlls_config should disable yamlls schemaStore when SchemaStore.nvim is available"
+  )
+  assert_equal(
+    schemastore_config.settings.yaml.schemaStore.url,
+    "",
+    "yamlls_config should clear the yamlls schema store URL when SchemaStore.nvim is available"
+  )
+  assert_equal(schemastore_config.settings.yaml.schemas, {
+    ["https://example.com/test.schema.json"] = "kustomization.yaml",
+  }, "yamlls_config should use SchemaStore.nvim YAML schemas when available")
+
+  package.loaded.schemastore = original_loaded
+  package.preload.schemastore = original_preload
 end
 
 ---@return nil

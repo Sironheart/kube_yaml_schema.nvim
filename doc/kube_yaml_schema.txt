@@ -32,6 +32,11 @@ Use `vim.g.kube_yaml_schema` to configure defaults:
 
 You can also call `require("kube_yaml_schema").setup(opts)`.
 
+When `b0o/SchemaStore.nvim` is installed,
+`require("kube_yaml_schema").yamlls_config()` automatically uses
+`require("schemastore").yaml.schemas()` and disables the built-in `yamlls`
+schema store.
+
 ==============================================================================
 3. Commands                                             *kube-yaml-schema-command*
 

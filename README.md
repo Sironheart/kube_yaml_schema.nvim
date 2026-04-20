@@ -24,6 +24,7 @@ I plan on maintaining it to be deprecation free with the latest stable release.
 - Context-aware target resolution (`context -> cluster`).
 - Cache scoped by cluster name.
 - Manual context override with picker and commands.
+- Automatic `b0o/SchemaStore.nvim` integration for `yamlls` when available.
 - Session-only LSP configuration updates (`workspace/didChangeConfiguration`).
 
 ## Requirements
@@ -47,7 +48,9 @@ mise run check
 ```lua
 {
   'Sironheart/kube_yaml_schema.nvim',
-  ft = { 'yaml', 'yaml.docker-compose', 'yaml.gitlab', 'yaml.helm-values' },
+  dependencies = {
+    'b0o/schemastore.nvim', -- optional to use the schemastore integration of this plugin
+  },
   cmd = { 'KubeYamlSchema' },
   opts = {
     auto_refresh = true,
@@ -55,6 +58,10 @@ mise run check
   },
 }
 ```
+
+If `b0o/SchemaStore.nvim` is installed, `yamlls_config()` will use
+`require('schemastore').yaml.schemas()` and disable the built-in `yamlls`
+schema store automatically.
 
 The plugin auto-initializes when loaded. You can configure it via either:
 
@@ -109,7 +116,7 @@ This takes care of adding kube_yaml_schema.nvim plugin and configuring `yamlls`,
   cache_ttl_seconds = 300,
   stale_on_error_seconds = 60,
   cache_dir = vim.fn.stdpath('cache') .. '/kube-yaml-schema',
-  schema_store_url = 'https://www.schemastore.org/api/json/catalog.json',
+  schema_store_url = 'https://www.schemastore.org/api/json/catalog.json', -- used when SchemaStore.nvim is unavailable
 }
 ```
 
