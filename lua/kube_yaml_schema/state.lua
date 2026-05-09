@@ -20,7 +20,15 @@ local M = {
   version_inflight = {},
   crd_cache = {},
   crd_inflight = {},
+  api_resource_cache = {},
+  api_resource_inflight = {},
+  completion_resources = {},
+  completion_client_registered = {},
+  default_omnifuncs = {},
+  default_completion_contexts = {},
   refresh_tokens = {},
+  field_refresh_tokens = {},
+  field_refresh_signatures = {},
   client_states = {},
 }
 
@@ -40,7 +48,13 @@ function M.reset_runtime()
   M.version_inflight = {}
   M.crd_cache = {}
   M.crd_inflight = {}
+  M.api_resource_cache = {}
+  M.api_resource_inflight = {}
+  M.completion_resources = {}
+  M.default_completion_contexts = {}
   M.refresh_tokens = {}
+  M.field_refresh_tokens = {}
+  M.field_refresh_signatures = {}
 end
 
 return M

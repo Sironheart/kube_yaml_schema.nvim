@@ -13,6 +13,9 @@
 ---@field auto_refresh boolean
 ---@field refresh_events string[]
 ---@field notify_on_auto_refresh boolean
+---@field refresh_on_kubernetes_fields boolean
+---@field field_refresh_debounce_ms number
+---@field context_completion boolean
 ---@field cache_ttl_seconds number|KubeYamlSchemaLegacyCacheTtlOptions
 ---@field stale_on_error_seconds number
 ---@field cache_dir string
@@ -26,6 +29,9 @@
 ---@field auto_refresh? boolean
 ---@field refresh_events? string[]
 ---@field notify_on_auto_refresh? boolean
+---@field refresh_on_kubernetes_fields? boolean
+---@field field_refresh_debounce_ms? number
+---@field context_completion? boolean
 ---@field cache_ttl_seconds? number|KubeYamlSchemaLegacyCacheTtlOptions
 ---@field stale_on_error_seconds? number
 ---@field cache_dir? string
@@ -89,14 +95,40 @@
 ---@field version_inflight table<string, KubeYamlSchemaVersionWaiter[]>
 ---@field crd_cache table<string, { index: KubeYamlSchemaCrdIndex, expires_at: number }>
 ---@field crd_inflight table<string, KubeYamlSchemaCrdIndexWaiter[]>
+---@field api_resource_cache table<string, { resources: KubeYamlSchemaResource[], expires_at: number }>
+---@field api_resource_inflight table<string, KubeYamlSchemaApiResourcesWaiter[]>
+---@field completion_resources table<integer, KubeYamlSchemaResource[]>
+---@field completion_client_registered table<string, boolean>
+---@field default_omnifuncs table<integer, string>
+---@field default_completion_contexts table<integer, KubeYamlSchemaCompletionContext>
 ---@field refresh_tokens table<integer, integer>
+---@field field_refresh_tokens table<integer, integer>
+---@field field_refresh_signatures table<integer, string>
 ---@field client_states table<integer, KubeYamlSchemaClientState>
+
+---@class KubeYamlSchemaDocument
+---@field kind string?
+---@field api_version string?
+---@field kind_text string?
+---@field api_version_text string?
+---@field has_kind boolean
+---@field has_api_version boolean
 
 ---@class KubeYamlSchemaResource
 ---@field group string
 ---@field version string
 ---@field kind string
 ---@field core boolean
+
+---@class KubeYamlSchemaCompletionContext
+---@field type "key"|"value"
+---@field bufnr integer
+---@field row integer
+---@field start_col integer
+---@field end_col integer
+---@field prefix string
+---@field field? "kind"|"apiVersion"
+---@field document table<string, string>
 
 ---@class KubeYamlSchemaTarget
 ---@field context string
@@ -152,6 +184,7 @@
 ---@alias KubeYamlSchemaExistsWaiter fun(exists: boolean, err: string?)
 ---@alias KubeYamlSchemaVersionWaiter fun(version: string?, err: string?)
 ---@alias KubeYamlSchemaCrdIndexWaiter fun(index: KubeYamlSchemaCrdIndex?, err: string?)
+---@alias KubeYamlSchemaApiResourcesWaiter fun(resources: KubeYamlSchemaResource[]?, err: string?)
 ---@alias KubeYamlSchemaKubeconfigWaiter fun(data: KubeYamlSchemaKubeconfigCache?, err: string?)
 ---@alias KubeYamlSchemaResolveWaiter fun(result: KubeYamlSchemaResolveResult, err: string?)
 

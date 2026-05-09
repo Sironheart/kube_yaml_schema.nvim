@@ -27,7 +27,7 @@ local function build_resource(api_version, kind)
 end
 
 ---@param resources KubeYamlSchemaResource[]
----@param current { kind?: string, api_version?: string }
+---@param current KubeYamlSchemaDocument
 ---@return nil
 local function append_resource(resources, current)
   if current.kind and current.api_version then
@@ -36,8 +36,9 @@ local function append_resource(resources, current)
 end
 
 ---@param raw string?
+---@param allow_templates boolean?
 ---@return string?
-local function parse_value(raw)
+function M.parse_field_value(raw, allow_templates)
   if not raw then
     return nil
   end
@@ -55,7 +56,7 @@ local function parse_value(raw)
     value = value:sub(2, -2)
   end
 
-  if value:find("{{", 1, true) then
+  if not allow_templates and value:find("{{", 1, true) then
     return nil
   end
 
@@ -105,20 +106,29 @@ function M.summarize_resources(resources, max_items)
 end
 
 ---@param bufnr integer
----@return KubeYamlSchemaResource[]
-function M.parse_kubernetes_resources(bufnr)
+---@return KubeYamlSchemaDocument[]
+function M.parse_kubernetes_documents(bufnr)
   local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
 
-  ---@type KubeYamlSchemaResource[]
-  local resources = {}
-  ---@type { kind?: string, api_version?: string }
-  local current = {}
+  ---@type KubeYamlSchemaDocument[]
+  local documents = {}
+  ---@type KubeYamlSchemaDocument
+  local current = {
+    has_kind = false,
+    has_api_version = false,
+  }
   local root_indent = nil
 
   ---@return nil
   local function flush_document()
-    append_resource(resources, current)
-    current = {}
+    if current.has_kind or current.has_api_version then
+      table.insert(documents, current)
+    end
+
+    current = {
+      has_kind = false,
+      has_api_version = false,
+    }
     root_indent = nil
   end
 
@@ -135,13 +145,25 @@ function M.parse_kubernetes_resources(bufnr)
 
       if root_indent ~= nil then
         local kind_indent, kind = line:match("^(%s*)kind%s*:%s*(.-)%s*$")
-        if kind and #kind_indent == root_indent and not current.kind then
-          current.kind = parse_value(kind)
+        if kind and #kind_indent == root_indent then
+          if not current.has_kind then
+            current.has_kind = true
+            current.kind_text = M.parse_field_value(kind, true)
+          end
+          if not current.kind then
+            current.kind = M.parse_field_value(kind)
+          end
         end
 
         local api_indent, api_version = line:match("^(%s*)apiVersion%s*:%s*(.-)%s*$")
-        if api_version and #api_indent == root_indent and not current.api_version then
-          current.api_version = parse_value(api_version)
+        if api_version and #api_indent == root_indent then
+          if not current.has_api_version then
+            current.has_api_version = true
+            current.api_version_text = M.parse_field_value(api_version, true)
+          end
+          if not current.api_version then
+            current.api_version = M.parse_field_value(api_version)
+          end
         end
       end
     end
@@ -149,7 +171,51 @@ function M.parse_kubernetes_resources(bufnr)
 
   flush_document()
 
+  return documents
+end
+
+---@param documents KubeYamlSchemaDocument[]
+---@return boolean
+function M.has_kubernetes_fields(documents)
+  for _, document in ipairs(documents) do
+    if document.has_kind or document.has_api_version then
+      return true
+    end
+  end
+
+  return false
+end
+
+---@param documents KubeYamlSchemaDocument[]
+---@return KubeYamlSchemaResource[]
+function M.resources_from_documents(documents)
+  ---@type KubeYamlSchemaResource[]
+  local resources = {}
+
+  for _, document in ipairs(documents) do
+    append_resource(resources, document)
+  end
+
   return resources
+end
+
+---@param bufnr integer
+---@return string
+function M.kubernetes_field_signature(bufnr)
+  local documents = M.parse_kubernetes_documents(bufnr)
+  local parts = {}
+
+  for _, document in ipairs(documents) do
+    table.insert(parts, table.concat({ document.api_version_text or "", document.kind_text or "" }, "|"))
+  end
+
+  return table.concat(parts, "\n")
+end
+
+---@param bufnr integer
+---@return KubeYamlSchemaResource[]
+function M.parse_kubernetes_resources(bufnr)
+  return M.resources_from_documents(M.parse_kubernetes_documents(bufnr))
 end
 
 return M

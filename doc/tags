@@ -1,0 +1,7 @@
+kube-yaml-schema	kube_yaml_schema.txt	/*kube-yaml-schema*
+kube-yaml-schema-command	kube_yaml_schema.txt	/*kube-yaml-schema-command*
+kube-yaml-schema-config	kube_yaml_schema.txt	/*kube-yaml-schema-config*
+kube-yaml-schema-health	kube_yaml_schema.txt	/*kube-yaml-schema-health*
+kube-yaml-schema-intro	kube_yaml_schema.txt	/*kube-yaml-schema-intro*
+kube-yaml-schema.nvim	kube_yaml_schema.txt	/*kube-yaml-schema.nvim*
+kube_yaml_schema.nvim	kube_yaml_schema.txt	/*kube_yaml_schema.nvim*

@@ -25,10 +25,19 @@ Use `vim.g.kube_yaml_schema` to configure defaults:
 >
   vim.g.kube_yaml_schema = {
     kubectl_timeout_ms = 5000,
+    refresh_on_kubernetes_fields = false,
+    field_refresh_debounce_ms = 250,
+    context_completion = true,
     cache_ttl_seconds = 300,
     notify = true,
   }
 <
+
+`refresh_on_kubernetes_fields` enables a debounced refresh while editing when a
+top-level `kind` or `apiVersion` field appears or changes. `context_completion`
+uses the active kubectl context to complete `kind` and `apiVersion` field names
+and values. It registers with blink.cmp when available, with coq through
+`COQsources`, and otherwise falls back to a Neovim omnifunc wrapper.
 
 You can also call `require("kube_yaml_schema").setup(opts)`.
 

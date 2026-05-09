@@ -1,4 +1,5 @@
 local cache = require("kube_yaml_schema.cache")
+local completion = require("kube_yaml_schema.completion")
 local constants = require("kube_yaml_schema.constants")
 local kubectl = require("kube_yaml_schema.kubectl")
 local lsp = require("kube_yaml_schema.lsp")
@@ -111,6 +112,9 @@ local function refresh_buffer(bufnr, opts)
     return
   end
 
+  state.field_refresh_signatures[bufnr] = parser.kubernetes_field_signature(bufnr)
+  completion.setup_buffer(bufnr)
+
   local clients = lsp.attached_yamlls_clients(bufnr)
   if #clients == 0 then
     if opts.notify then
@@ -135,6 +139,46 @@ local function refresh_buffer(bufnr, opts)
     local changed = lsp.apply_buffer_schema(bufnr, schema)
     notify_resolution_result(opts, result, err, changed)
   end)
+end
+
+---@param bufnr integer
+---@return nil
+local function schedule_field_refresh(bufnr)
+  state.field_refresh_tokens[bufnr] = (state.field_refresh_tokens[bufnr] or 0) + 1
+  local token = state.field_refresh_tokens[bufnr]
+
+  vim.defer_fn(function()
+    if state.field_refresh_tokens[bufnr] ~= token then
+      return
+    end
+
+    if not vim.api.nvim_buf_is_valid(bufnr) or not util.is_yaml_filetype(bufnr) then
+      return
+    end
+
+    refresh_buffer(bufnr, { notify = state.opts.notify_on_auto_refresh })
+  end, state.opts.field_refresh_debounce_ms)
+end
+
+---@param bufnr integer
+---@return nil
+local function refresh_on_kubernetes_field_change(bufnr)
+  if not vim.api.nvim_buf_is_valid(bufnr) or not util.is_yaml_filetype(bufnr) then
+    return
+  end
+
+  local signature = parser.kubernetes_field_signature(bufnr)
+  local previous = state.field_refresh_signatures[bufnr]
+  if (previous == nil or previous == "") and signature == "" then
+    return
+  end
+
+  if previous == signature then
+    return
+  end
+
+  state.field_refresh_signatures[bufnr] = signature
+  schedule_field_refresh(bufnr)
 end
 
 ---@param opts KubeYamlSchemaRefreshOpts?
@@ -445,6 +489,16 @@ local function register_autocmds()
         end
       end,
     })
+
+    if state.opts.refresh_on_kubernetes_fields then
+      vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI" }, {
+        group = group,
+        ---@param args vim.api.keyset.create_autocmd.callback_args
+        callback = function(args)
+          refresh_on_kubernetes_field_change(args.buf)
+        end,
+      })
+    end
   end
 
   vim.api.nvim_create_autocmd("BufWipeout", {
@@ -452,7 +506,10 @@ local function register_autocmds()
     ---@param args vim.api.keyset.create_autocmd.callback_args
     callback = function(args)
       lsp.remove_buffer_overrides(args.buf)
+      completion.clear_buffer(args.buf)
       state.refresh_tokens[args.buf] = nil
+      state.field_refresh_tokens[args.buf] = nil
+      state.field_refresh_signatures[args.buf] = nil
     end,
   })
 end
@@ -671,6 +728,7 @@ function M.configure(opts)
   apply_options("require('kube_yaml_schema').configure", opts)
 
   if state.initialized then
+    completion.setup()
     register_autocmds()
   end
 end
@@ -694,6 +752,7 @@ function M.init()
     state.commands_registered = true
   end
 
+  completion.setup()
   register_autocmds()
   state.initialized = true
 end

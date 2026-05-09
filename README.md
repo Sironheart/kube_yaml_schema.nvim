@@ -20,6 +20,8 @@ I plan on maintaining it to be deprecation free with the latest stable release.
 ## Features
 
 - Automatic schema application for YAML buffers.
+- Optional debounced refresh when top-level `kind` or `apiVersion` fields appear or change.
+- Context-aware `kind` and `apiVersion` completions from `kubectl api-resources`.
 - Multi-document YAML support (`---`) with composed per-document rules.
 - Context-aware target resolution (`context -> cluster`).
 - Cache scoped by cluster name.
@@ -112,6 +114,9 @@ This takes care of adding kube_yaml_schema.nvim plugin and configuring `yamlls`,
   auto_refresh = true,
   refresh_events = { 'BufEnter', 'BufWritePost' },
   notify_on_auto_refresh = false,
+  refresh_on_kubernetes_fields = false,
+  field_refresh_debounce_ms = 250,
+  context_completion = true,
   notify = true,
   cache_ttl_seconds = 300,
   stale_on_error_seconds = 60,
@@ -119,6 +124,13 @@ This takes care of adding kube_yaml_schema.nvim plugin and configuring `yamlls`,
   schema_store_url = 'https://www.schemastore.org/api/json/catalog.json', -- used when SchemaStore.nvim is unavailable
 }
 ```
+
+Set `refresh_on_kubernetes_fields = true` to refresh while editing as soon as a
+top-level `kind` or `apiVersion` field is added or changed. `context_completion`
+registers completion support for top-level `kind` and `apiVersion` fields and
+values from the active kubectl context. It uses blink.cmp when available, coq via
+`COQsources`, and otherwise installs a Neovim omnifunc wrapper that delegates to
+the existing LSP omnifunc outside Kubernetes fields.
 
 ## Commands
 

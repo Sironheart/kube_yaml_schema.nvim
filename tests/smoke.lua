@@ -1,8 +1,10 @@
 vim.opt.runtimepath:append(vim.fn.getcwd())
 
+local completion = require("kube_yaml_schema.completion")
 local constants = require("kube_yaml_schema.constants")
 local parser = require("kube_yaml_schema.parser")
 local plugin = require("kube_yaml_schema")
+local state = require("kube_yaml_schema.state")
 
 ---@param message string
 ---@return nil
@@ -84,6 +86,28 @@ local function run_parser_tests()
     { group = "tuppr.home-operations.com", version = "v1alpha1", kind = "KubernetesUpgrade", core = false },
   }, "parse_kubernetes_resources should keep the top-level manifest resource")
 
+  local partial_bufnr = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_buf_set_lines(partial_bufnr, 0, -1, false, {
+    "apiVersion: apps/v1",
+    "metadata:",
+    "  name: example",
+    "---",
+    "kind: Deployment",
+  })
+
+  local partial_documents = parser.parse_kubernetes_documents(partial_bufnr)
+  assert_true(parser.has_kubernetes_fields(partial_documents), "parse_kubernetes_documents should track partial fields")
+  assert_equal(
+    parser.resources_from_documents(partial_documents),
+    {},
+    "resources_from_documents should require both apiVersion and kind"
+  )
+  assert_equal(
+    parser.kubernetes_field_signature(partial_bufnr),
+    "apps/v1|\n|Deployment",
+    "kubernetes_field_signature should track top-level kind/apiVersion changes"
+  )
+
   assert_equal(
     parser.summarize_resources({
       { group = "", version = "v1", kind = "Service", core = true },
@@ -95,6 +119,71 @@ local function run_parser_tests()
     }),
     "detected 6 resources: v1 Service, apps/v1 Deployment, batch/v1 CronJob, networking.k8s.io/v1 Ingress, rbac.authorization.k8s.io/v1 Role, +1 more",
     "summarize_resources should produce concise debug output"
+  )
+end
+
+---@return nil
+local function run_completion_tests()
+  local bufnr = vim.api.nvim_create_buf(false, true)
+  vim.bo[bufnr].filetype = "yaml"
+  vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, {
+    "kind: Deployment",
+    "apiVersion: ",
+  })
+
+  local ctx = completion.context_for_position(bufnr, 1, #"apiVersion: ")
+  assert_true(ctx ~= nil and ctx.field == "apiVersion", "context_for_position should detect apiVersion values")
+
+  local items = completion.items_from_context(ctx, {
+    { group = "", version = "v1", kind = "Pod", core = true },
+    { group = "apps", version = "v1", kind = "Deployment", core = true },
+  })
+
+  assert_equal(#items, 1, "items_from_context should narrow apiVersion by kind")
+  assert_equal(items[1].label, "apps/v1", "items_from_context should use active context resources")
+
+  vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "api" })
+  local key_ctx = completion.context_for_position(bufnr, 0, #"api")
+  local key_items = completion.items_from_context(key_ctx, nil, { filter_prefix = true })
+  assert_equal(key_items[1].label, "apiVersion", "items_from_context should complete Kubernetes field names")
+
+  vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "kind: " })
+  local kind_ctx = completion.context_for_position(bufnr, 0, #"kind: ")
+  local kind_items = completion.items_from_context(kind_ctx, {
+    { group = "", version = "v1", kind = "Pod", core = true },
+    { group = "apps", version = "v1", kind = "Deployment", core = true },
+  })
+  assert_equal(
+    kind_items[1].additionalTextEdits[1].newText,
+    "apiVersion: apps/v1\n",
+    "kind completion should add apiVersion above kind"
+  )
+
+  vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "api" })
+  vim.api.nvim_set_current_buf(bufnr)
+  vim.api.nvim_win_set_cursor(0, { 1, #"api" })
+  completion.install_default_completion(bufnr)
+  assert_equal(completion.omnifunc(1, ""), 0, "omnifunc should start at the Kubernetes field prefix")
+  assert_equal(
+    completion.omnifunc(0, "api")[1].word,
+    "apiVersion: ",
+    "omnifunc should return default Neovim completion items"
+  )
+
+  vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "kind: " })
+  state.completion_resources[bufnr] = {
+    { group = "apps", version = "v1", kind = "Deployment", core = true },
+  }
+  vim.api.nvim_win_set_cursor(0, { 1, #"kind: " })
+  assert_equal(completion.omnifunc(1, ""), #"kind:", "omnifunc should complete kind values")
+  local default_kind_item = completion.omnifunc(0, "")[1]
+  assert_equal(default_kind_item.word, "Deployment", "omnifunc should return kind values")
+  vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "kind: Deployment" })
+  completion.apply_complete_done_item(default_kind_item, bufnr)
+  assert_equal(
+    vim.api.nvim_buf_get_lines(bufnr, 0, -1, false),
+    { "apiVersion: apps/v1", "kind: Deployment" },
+    "default omnifunc should apply apiVersion additional edits"
   )
 end
 
@@ -201,6 +290,7 @@ local function run_command_completion_tests()
 end
 
 run_parser_tests()
+run_completion_tests()
 run_options_tests()
 run_config_tests()
 run_command_completion_tests()

@@ -1,4 +1,6 @@
 local cache = require("kube_yaml_schema.cache")
+local constants = require("kube_yaml_schema.constants")
+local parser = require("kube_yaml_schema.parser")
 local state = require("kube_yaml_schema.state")
 
 local M = {}
@@ -169,6 +171,86 @@ local function build_crd_index(crd_payload)
   end
 
   return index
+end
+
+---@param resource KubeYamlSchemaResource
+---@return string
+local function api_version(resource)
+  if resource.group == "" then
+    return resource.version
+  end
+
+  return string.format("%s/%s", resource.group, resource.version)
+end
+
+---@param resource KubeYamlSchemaResource
+---@return string
+local function api_resource_key(resource)
+  return string.lower(api_version(resource) .. "|" .. resource.kind)
+end
+
+---@param a KubeYamlSchemaResource
+---@param b KubeYamlSchemaResource
+---@return boolean
+local function api_resource_sort(a, b)
+  local a_api_version = api_version(a)
+  local b_api_version = api_version(b)
+
+  if a_api_version == b_api_version then
+    return a.kind < b.kind
+  end
+
+  return a_api_version < b_api_version
+end
+
+---@param api_version_value string
+---@param kind string
+---@return KubeYamlSchemaResource
+local function build_api_resource(api_version_value, kind)
+  local group, version = parser.parse_api_version(api_version_value)
+  return {
+    group = group,
+    version = version,
+    kind = kind,
+    core = constants.core_api_groups[group] == true,
+  }
+end
+
+---@param output string
+---@return KubeYamlSchemaResource[]
+local function parse_api_resources(output)
+  local resources_by_key = {}
+
+  for line in output:gmatch("[^\r\n]+") do
+    local fields = vim.split(line, "%s+", { trimempty = true })
+    local api_version_value = nil
+    local kind = nil
+
+    for index = 2, #fields - 1 do
+      if fields[index] == "true" or fields[index] == "false" then
+        api_version_value = fields[index - 1]
+        kind = fields[index + 1]
+        break
+      end
+    end
+
+    if
+      type(api_version_value) == "string"
+      and api_version_value ~= ""
+      and api_version_value ~= "APIVERSION"
+      and type(kind) == "string"
+      and kind ~= ""
+      and kind ~= "KIND"
+      and kind ~= "<none>"
+    then
+      local resource = build_api_resource(api_version_value, kind)
+      resources_by_key[api_resource_key(resource)] = resource
+    end
+  end
+
+  local resources = vim.tbl_values(resources_by_key)
+  table.sort(resources, api_resource_sort)
+  return resources
 end
 
 ---@param callback KubeYamlSchemaKubeconfigWaiter
@@ -559,6 +641,60 @@ function M.get_crd_index(target, callback)
 
     cache.write_json_file(cache_path, index)
     flush_waiters(waiters, index, nil)
+  end)
+end
+
+---@param target KubeYamlSchemaTarget
+---@param callback KubeYamlSchemaApiResourcesWaiter
+---@return nil
+function M.get_api_resources(target, callback)
+  local cache_key = target.cluster
+  local cached = state.api_resource_cache[cache_key]
+  if cached and cached.expires_at > os.time() then
+    callback(cached.resources, nil)
+    return
+  end
+
+  if state.api_resource_inflight[cache_key] then
+    table.insert(state.api_resource_inflight[cache_key], callback)
+    return
+  end
+
+  ---@type KubeYamlSchemaApiResourcesWaiter[]
+  state.api_resource_inflight[cache_key] = { callback }
+
+  run_kubectl_for_context(target.context, { "api-resources", "--no-headers", "-o", "wide" }, function(result)
+    ---@type KubeYamlSchemaApiResourcesWaiter[]
+    local waiters = state.api_resource_inflight[cache_key] or {}
+    state.api_resource_inflight[cache_key] = nil
+
+    if result.code ~= 0 then
+      if cached and cached.resources then
+        flush_waiters(waiters, cached.resources, nil)
+        return
+      end
+
+      flush_waiters(waiters, nil, vim.trim(result.stderr or "failed to fetch API resources"))
+      return
+    end
+
+    local resources = parse_api_resources(result.stdout or "")
+    if #resources == 0 then
+      if cached and cached.resources then
+        flush_waiters(waiters, cached.resources, nil)
+        return
+      end
+
+      flush_waiters(waiters, nil, "failed to parse API resources")
+      return
+    end
+
+    state.api_resource_cache[cache_key] = {
+      resources = resources,
+      expires_at = expires_at(cache_ttl()),
+    }
+
+    flush_waiters(waiters, resources, nil)
   end)
 end
 

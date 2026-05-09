@@ -1,5 +1,5 @@
 local M = {}
-local unpack = unpack or table.unpack
+local unpack = unpack
 
 ---@type table<string, boolean>
 M.core_api_groups = {
@@ -30,6 +30,9 @@ M.defaults = {
   auto_refresh = true,
   refresh_events = { "BufEnter", "BufWritePost" },
   notify_on_auto_refresh = false,
+  refresh_on_kubernetes_fields = false,
+  field_refresh_debounce_ms = 250,
+  context_completion = true,
   cache_ttl_seconds = 300,
   stale_on_error_seconds = 60,
   cache_dir = vim.fn.stdpath("cache") .. "/kube-yaml-schema",
@@ -45,6 +48,9 @@ M.option_keys = {
   auto_refresh = true,
   refresh_events = true,
   notify_on_auto_refresh = true,
+  refresh_on_kubernetes_fields = true,
+  field_refresh_debounce_ms = true,
+  context_completion = true,
   cache_ttl_seconds = true,
   stale_on_error_seconds = true,
   cache_dir = true,
@@ -143,6 +149,9 @@ function M.validate_options(opts, path)
     auto_refresh = { opts.auto_refresh, "boolean", true },
     refresh_events = { opts.refresh_events, is_refresh_events, "list of strings" },
     notify_on_auto_refresh = { opts.notify_on_auto_refresh, "boolean", true },
+    refresh_on_kubernetes_fields = { opts.refresh_on_kubernetes_fields, "boolean", true },
+    field_refresh_debounce_ms = { opts.field_refresh_debounce_ms, "number", true },
+    context_completion = { opts.context_completion, "boolean", true },
     cache_ttl_seconds = {
       opts.cache_ttl_seconds,
       function(value)
@@ -203,6 +212,18 @@ function M.normalize_options(opts)
 
   if type(opts.notify_on_auto_refresh) == "boolean" then
     normalized.notify_on_auto_refresh = opts.notify_on_auto_refresh
+  end
+
+  if type(opts.refresh_on_kubernetes_fields) == "boolean" then
+    normalized.refresh_on_kubernetes_fields = opts.refresh_on_kubernetes_fields
+  end
+
+  if type(opts.context_completion) == "boolean" then
+    normalized.context_completion = opts.context_completion
+  end
+
+  if type(opts.field_refresh_debounce_ms) == "number" and opts.field_refresh_debounce_ms >= 0 then
+    normalized.field_refresh_debounce_ms = opts.field_refresh_debounce_ms
   end
 
   if type(opts.notify) == "boolean" then
