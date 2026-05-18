@@ -1,5 +1,5 @@
 [tools]
-neovim = "0.11.6"
+neovim = "0.12.2"
 stylua = "latest"
 "aqua:Kampfkarren/selene" = "latest"
 
