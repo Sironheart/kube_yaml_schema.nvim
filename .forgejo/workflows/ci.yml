@@ -19,11 +19,8 @@ jobs:
         uses: https://code.forgejo.org/actions/checkout@v6
 
       - name: Check Lua formatting
-        uses: https://github.com/JohnnyMorganz/stylua-action@v5
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          version: latest
-          args: --check .
+        run: |
+          npx @johnnymorganz/stylua-bin --check .
 
   selene:
     name: Static analysis
@@ -62,6 +59,12 @@ jobs:
         with:
           neovim: true
           version: ${{ matrix.neovim-version }}
+
+      - name: Install kubectl
+        run: |
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
 
       - name: Run smoke tests
         run: nvim --headless -u NONE -l tests/smoke.lua
