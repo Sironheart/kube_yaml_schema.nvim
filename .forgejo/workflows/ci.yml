@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: https://code.forgejo.org/actions/checkout@v6
+        uses: https://code.forgejo.org/actions/checkout@v7
 
       - name: Check Lua formatting
         run: |
@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: https://code.forgejo.org/actions/checkout@v6
+        uses: https://code.forgejo.org/actions/checkout@v7
 
       - name: Install Rust toolchain
         uses: https://github.com/dtolnay/rust-toolchain@stable
@@ -52,7 +52,7 @@ jobs:
           - nightly
     steps:
       - name: Check out repository
-        uses: https://code.forgejo.org/actions/checkout@v6
+        uses: https://code.forgejo.org/actions/checkout@v7
 
       - name: Install Neovim
         uses: https://github.com/rhysd/action-setup-vim@v1
