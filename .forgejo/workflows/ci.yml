@@ -33,7 +33,7 @@ jobs:
         uses: https://github.com/dtolnay/rust-toolchain@stable
 
       - name: Cache Rust dependencies
-        uses: https://github.com/Swatinem/rust-cache@v2
+        uses: https://github.com/Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
 
       - name: Install Selene
         run: cargo install --locked selene
