@@ -55,7 +55,7 @@ jobs:
         uses: https://code.forgejo.org/actions/checkout@v7
 
       - name: Install Neovim
-        uses: https://github.com/rhysd/action-setup-vim@v1
+        uses: https://github.com/rhysd/action-setup-vim@febef33995d6649302e9d88dda81e071b68f16a7 # v1.6.1
         with:
           neovim: true
           version: ${{ matrix.neovim-version }}
