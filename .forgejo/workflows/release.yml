@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out tagged commit
-        uses: https://code.forgejo.org/actions/checkout@v7
+        uses: https://code.forgejo.org/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Neovim
         uses: https://github.com/rhysd/action-setup-vim@febef33995d6649302e9d88dda81e071b68f16a7 # v1.6.1
